@@ -1,81 +1,67 @@
-import express from 'express';
-import cors from 'cors';
-import path from 'path';
-import ingredientesRoutes from './routes/ingredientes/ingredientesRoutes.js';
+/**
+ * Bootstrap do servidor.
+ *
+ * Sequência:
+ *  1. Carrega .env
+ *  2. Inicializa banco (cria schema se necessário)
+ *  3. Roda seed automático se AUTO_SEED=true
+ *  4. Cria o app Express
+ *  5. Escuta na porta configurada
+ *
+ * Em Render, a variável PORT é injetada automaticamente pelo platform.
+ */
 
-const app = express();
+import 'dotenv/config';
+import { createApp } from './app.js';
+import { initSchema, closeDb } from './config/database.js';
+import { runSeed } from './database/seed.js';
 
-/* =========================
-   ESTADO GLOBAL DA BALANÇA
-========================= */
-let ultimoPeso = 0;
-let precisaTarar = false;
+const PORT = Number(process.env.PORT) || 3000;
+const HOST = '0.0.0.0';
 
-/* =========================
-   MIDDLEWARES
-========================= */
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.resolve(process.cwd(), 'public')));
+async function bootstrap(): Promise<void> {
+  try {
+    // 1) Inicializa schema (idempotente)
+    await initSchema();
 
-/* =========================
-   ROTAS DE INGREDIENTES
-========================= */
-app.use('/ingredientes', ingredientesRoutes);
+    // 2) Seed automático se solicitado e banco vazio
+    if (process.env.AUTO_SEED === 'true') {
+      await runSeed();
+    }
 
-/* =========================
-   BALANÇA (HTTP)
-========================= */
+    // 3) Cria e sobe o app
+    const app = createApp();
+    const server = app.listen(PORT, HOST, () => {
+      console.log('');
+      console.log('🚀 ============================================');
+      console.log(`🚀 Custo Certo rodando em http://${HOST}:${PORT}`);
+      console.log(`🚀 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+      console.log('🚀 ============================================');
+      console.log('');
+    });
 
-// ESP32 envia peso
-app.post('/balanca/peso', (req, res) => {
-  const { peso } = req.body;
-  if (typeof peso === 'number') {
-    ultimoPeso = peso;
-    console.log('⚖️ Peso recebido:', ultimoPeso);
+    // 4) Graceful shutdown
+    const shutdown = (signal: string) => {
+      console.log(`\n🛑 ${signal} recebido, encerrando...`);
+      server.close(() => {
+        closeDb();
+        console.log('👋 Servidor encerrado');
+        process.exit(0);
+      });
+
+      // Força saída se demorar mais de 10s
+      setTimeout(() => {
+        console.error('⚠️  Forçando shutdown');
+        process.exit(1);
+      }, 10_000);
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+  } catch (err) {
+    console.error('💥 Falha ao iniciar servidor:', err);
+    process.exit(1);
   }
-  res.json({ ok: true });
-});
+}
 
-// Frontend lê peso
-app.get('/balanca/peso', (_, res) => {
-  res.json({ peso: ultimoPeso });
-});
-
-// Frontend pede tara
-app.post('/balanca/tara', (_, res) => {
-  precisaTarar = true;
-  res.json({ ok: true });
-});
-
-// ESP32 verifica tara
-app.get('/balanca/tara', (_, res) => {
-  res.json({ tarar: precisaTarar });
-  precisaTarar = false;
-});
-
-// Confirmar pesagem
-app.post('/balanca/confirmar', (_, res) => {
-  if (ultimoPeso <= 0) {
-    return res.status(400).json({ erro: 'Peso inválido' });
-  }
-
-  res.json({
-    ok: true,
-    pesoConfirmado: ultimoPeso
-  });
-});
-
-/* =========================
-   FRONTEND
-========================= */
-app.get('/', (_, res) => {
-  res.sendFile(path.resolve(process.cwd(), 'public', 'index.html'));
-});
-
-/* =========================
-   START
-========================= */
-app.listen(3000, '0.0.0.0', () => {
-  console.log('🚀 Servidor rodando em http://0.0.0.0:3000');
-});
+bootstrap();
