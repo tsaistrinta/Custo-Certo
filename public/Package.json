@@ -1,0 +1,14 @@
+{
+  "name": "custo-certo-tests",
+  "version": "1.0.0",
+  "description": "Testes E2E do Custo Certo com Cypress",
+  "scripts": {
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "serve": "npx serve . -p 5500"
+  },
+  "devDependencies": {
+    "cypress": "^13.0.0",
+    "serve": "^14.0.0"
+  }
+}
