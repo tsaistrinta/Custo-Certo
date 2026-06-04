@@ -29,6 +29,23 @@ export interface IngredienteInput {
   validade?: string | null;
 }
 
+/**
+ * Payload de atualização parcial (PUT /ingredientes/:id).
+ *
+ * Todos os campos são opcionais — só atualiza o que for enviado.
+ *
+ * NÃO inclui `qtd` de propósito: o estoque só muda via movimentação
+ * (compra ou retirada), nunca por edição direta. Isso preserva a
+ * integridade da auditoria de estoque (rastreio FIFO por lote).
+ */
+export interface IngredienteUpdateInput {
+  nome?: string;
+  unidade?: Unidade;
+  preco?: number;
+  qtdMax?: number;
+  validade?: string | null;
+}
+
 /** Payload de uma nova compra (entrada) de um ingrediente já existente */
 export interface CompraInput {
   quantidade: number;        // quanto está sendo adicionado

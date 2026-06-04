@@ -10,6 +10,7 @@ import { NotFoundError, ConflictError } from '../errors/app-error.js';
 import type {
   Ingrediente,
   IngredienteInput,
+  IngredienteUpdateInput,
   CompraInput,
 } from '../models/ingrediente.model.js';
 import type { HistoricoItem } from '../models/pesagem.model.js';
@@ -27,6 +28,16 @@ export const ingredienteService = {
 
   async criar(input: IngredienteInput): Promise<Ingrediente> {
     return ingredienteRepository.criar(input);
+  },
+
+  /**
+   * Atualização parcial. Lança 404 se o ingrediente não existir.
+   * A regra de "qtd não editável" é aplicada na camada de schema.
+   */
+  async atualizar(id: number, update: IngredienteUpdateInput): Promise<Ingrediente> {
+    const atualizado = await ingredienteRepository.atualizar(id, update);
+    if (!atualizado) throw new NotFoundError('Ingrediente');
+    return atualizado;
   },
 
   async registrarCompra(id: number, compra: CompraInput): Promise<Ingrediente> {

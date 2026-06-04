@@ -10,6 +10,7 @@ import cors from 'cors';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import routes from './routes/index.js';
+import { mountSwagger } from './config/swagger.js';
 import { errorHandler, notFoundHandler } from './middlewares/error-handler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -43,6 +44,10 @@ export function createApp(): Express {
       next();
     });
   }
+
+  // ---- Documentação Swagger (UI em /api-docs, JSON em /api-docs.json) ----
+  // Montado ANTES das rotas e do fallback SPA para não ser interceptado.
+  mountSwagger(app);
 
   // ---- Estáticos do frontend ----
   // Em produção (build via tsc), __dirname é dist/. A pasta public/ fica

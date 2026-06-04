@@ -9,6 +9,7 @@ import type { Request, Response } from 'express';
 import { ingredienteService } from '../services/ingrediente.service.js';
 import {
   validateIngredienteInput,
+  validateIngredienteUpdate,
   validateCompraInput,
   validateId,
 } from '../schemas/ingrediente.schema.js';
@@ -40,6 +41,14 @@ export const ingredientesController = {
     res.status(201).json(novo);
   },
 
+  /** PUT /ingredientes/:id — atualização parcial (não altera qtd) */
+  async atualizar(req: Request<{ id: string }>, res: Response): Promise<void> {
+    const id = validateId(req.params.id);
+    const update = validateIngredienteUpdate(req.body);
+    const atualizado = await ingredienteService.atualizar(id, update);
+    res.json(atualizado);
+  },
+
   /** POST /ingredientes/:id/compras */
   async registrarCompra(req: Request<{ id: string }>, res: Response): Promise<void> {
     const id = validateId(req.params.id);
@@ -56,14 +65,14 @@ export const ingredientesController = {
   },
 
   /** POST /ingredientes/:id/retirada */
-async retirar(req: Request<{ id: string }>, res: Response): Promise<void> {
-  const id = validateId(req.params.id);
-  const { quantidade } = req.body;
-  if (!quantidade || quantidade <= 0) {
-    res.status(400).json({ erro: 'Quantidade inválida' });
-    return;
-  }
-  const atualizado = await ingredienteService.abaterConsumo(id, quantidade, 'Retirada manual');
-  res.json(atualizado);
-},
+  async retirar(req: Request<{ id: string }>, res: Response): Promise<void> {
+    const id = validateId(req.params.id);
+    const { quantidade } = req.body;
+    if (!quantidade || quantidade <= 0) {
+      res.status(400).json({ erro: 'Quantidade inválida' });
+      return;
+    }
+    const atualizado = await ingredienteService.abaterConsumo(id, quantidade, 'Retirada manual');
+    res.json(atualizado);
+  },
 };

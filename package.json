@@ -15,20 +15,21 @@
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
-  "dev": "tsx watch src/server.ts",
-  "build": "tsc && node -e \"require('fs').mkdirSync('dist/database',{recursive:true});require('fs').copyFileSync('src/database/schema.sql','dist/database/schema.sql')\"",
-  "start": "node dist/server.js",
-  "seed": "tsx src/database/seed.ts",
-  "postinstall": "npm run build",
-  "cy:open": "cypress open",
-  "cy:run": "cypress run",
-  "test": "cypress run"
-},
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc && node -e \"require('fs').mkdirSync('dist/database',{recursive:true});require('fs').copyFileSync('src/database/schema.sql','dist/database/schema.sql')\"",
+    "start": "node dist/server.js",
+    "seed": "tsx src/database/seed.ts",
+    "postinstall": "npm run build",
+    "cy:open": "cypress open",
+    "cy:run": "cypress run",
+    "test": "cypress run"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.6.2",
+    "@types/swagger-ui-express": "^4.1.8",
     "cypress": "^15.15.0",
     "tsx": "^4.21.0"
   },
@@ -39,6 +40,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "swagger-ui-express": "^5.0.1",
     "typescript": "^6.0.3"
   }
 }

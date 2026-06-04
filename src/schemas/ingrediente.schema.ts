@@ -6,6 +6,7 @@
 import { AppError } from '../errors/app-error.js';
 import type {
   IngredienteInput,
+  IngredienteUpdateInput,
   CompraInput,
   Unidade,
 } from '../models/ingrediente.model.js';
@@ -75,6 +76,86 @@ export function validateIngredienteInput(body: unknown): IngredienteInput {
   }
 
   return { nome, unidade, preco, qtd, qtdMax, validade };
+}
+
+/**
+ * Valida payload de atualização parcial (PUT /ingredientes/:id).
+ *
+ * Regras:
+ *  - todos os campos são opcionais, mas pelo menos um deve ser enviado;
+ *  - `qtd` é REJEITADO explicitamente — estoque só muda via compra/retirada;
+ *  - `validade` aceita null ou '' para LIMPAR a data.
+ *
+ * Lança AppError(400) se inválido.
+ */
+export function validateIngredienteUpdate(body: unknown): IngredienteUpdateInput {
+  if (!body || typeof body !== 'object') {
+    throw new AppError('Corpo da requisição inválido', 400);
+  }
+
+  const b = body as Record<string, unknown>;
+
+  // qtd é protegido por auditoria — não pode ser editado por aqui
+  if ('qtd' in b) {
+    throw new AppError(
+      'Campo "qtd" não pode ser editado diretamente. Use POST /ingredientes/:id/compras (entrada) ou /retirada (saída).',
+      400,
+    );
+  }
+
+  const update: IngredienteUpdateInput = {};
+
+  // nome
+  if (b.nome !== undefined) {
+    const nome = typeof b.nome === 'string' ? b.nome.trim() : '';
+    if (!nome) throw new AppError('Campo "nome" não pode ser vazio', 400);
+    if (nome.length > 150) throw new AppError('Campo "nome" deve ter no máximo 150 caracteres', 400);
+    update.nome = nome;
+  }
+
+  // unidade
+  if (b.unidade !== undefined) {
+    const unidade = b.unidade as Unidade;
+    if (!UNIDADES_VALIDAS.includes(unidade)) {
+      throw new AppError(`Campo "unidade" deve ser um de: ${UNIDADES_VALIDAS.join(', ')}`, 400);
+    }
+    update.unidade = unidade;
+  }
+
+  // preco
+  if (b.preco !== undefined) {
+    const preco = Number(b.preco);
+    if (!isFiniteNumber(preco) || preco < 0) {
+      throw new AppError('Campo "preco" deve ser um número >= 0', 400);
+    }
+    update.preco = preco;
+  }
+
+  // qtdMax
+  if (b.qtdMax !== undefined) {
+    const qtdMax = Number(b.qtdMax);
+    if (!isFiniteNumber(qtdMax) || qtdMax <= 0) {
+      throw new AppError('Campo "qtdMax" deve ser um número > 0', 400);
+    }
+    update.qtdMax = qtdMax;
+  }
+
+  // validade — null ou '' limpa a data
+  if (b.validade !== undefined) {
+    if (b.validade === null || b.validade === '') {
+      update.validade = null;
+    } else if (!isValidIsoDate(b.validade)) {
+      throw new AppError('Campo "validade" deve estar no formato YYYY-MM-DD', 400);
+    } else {
+      update.validade = b.validade as string;
+    }
+  }
+
+  if (Object.keys(update).length === 0) {
+    throw new AppError('Envie ao menos um campo para atualizar', 400);
+  }
+
+  return update;
 }
 
 /**

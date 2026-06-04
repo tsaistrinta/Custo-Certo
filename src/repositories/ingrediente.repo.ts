@@ -9,6 +9,7 @@ import { getDb } from '../config/database.js';
 import type {
   Ingrediente,
   IngredienteInput,
+  IngredienteUpdateInput,
   CompraInput,
 } from '../models/ingrediente.model.js';
 import type { HistoricoItem, Movimentacao } from '../models/pesagem.model.js';
@@ -30,37 +31,37 @@ function rowToIngrediente(row: Record<string, unknown>): Ingrediente {
 
 export const ingredienteRepository = {
   /** Lista todos, mais recentes primeiro */
-async listarTodos(): Promise<Ingrediente[]> {
-  const db = getDb();
-  const { rows } = await db.execute('SELECT * FROM ingredientes ORDER BY id DESC');
-  const ingredientes = rows.map((r) => rowToIngrediente(r as Record<string, unknown>));
+  async listarTodos(): Promise<Ingrediente[]> {
+    const db = getDb();
+    const { rows } = await db.execute('SELECT * FROM ingredientes ORDER BY id DESC');
+    const ingredientes = rows.map((r) => rowToIngrediente(r as Record<string, unknown>));
 
-  const { rows: movRows } = await db.execute(`
-    SELECT id, ingrediente_id, quantidade, preco_unitario, data, validade
-    FROM movimentacoes_estoque
-    WHERE tipo = 'entrada'
-    ORDER BY data ASC, id ASC
-  `);
+    const { rows: movRows } = await db.execute(`
+      SELECT id, ingrediente_id, quantidade, preco_unitario, data, validade
+      FROM movimentacoes_estoque
+      WHERE tipo = 'entrada'
+      ORDER BY data ASC, id ASC
+    `);
 
-  const lotesPorId: Record<number, object[]> = {};
-  for (const row of movRows) {
-    const r = row as Record<string, unknown>;
-    const ingId = Number(r.ingrediente_id);
-    if (!lotesPorId[ingId]) lotesPorId[ingId] = [];
-    lotesPorId[ingId].push({
-      id:            Number(r.id),
-      quantidade:    Number(r.quantidade),
-      precoUnitario: Number(r.preco_unitario ?? 0),
-      dataEntrada:   String(r.data),
-      validade:      r.validade ? String(r.validade) : null,
-    });
-  }
+    const lotesPorId: Record<number, object[]> = {};
+    for (const row of movRows) {
+      const r = row as Record<string, unknown>;
+      const ingId = Number(r.ingrediente_id);
+      if (!lotesPorId[ingId]) lotesPorId[ingId] = [];
+      lotesPorId[ingId].push({
+        id:            Number(r.id),
+        quantidade:    Number(r.quantidade),
+        precoUnitario: Number(r.preco_unitario ?? 0),
+        dataEntrada:   String(r.data),
+        validade:      r.validade ? String(r.validade) : null,
+      });
+    }
 
-  return ingredientes.map((ing) => ({
-    ...ing,
-    lotes: lotesPorId[ing.id] ?? [],
-  }));
-},
+    return ingredientes.map((ing) => ({
+      ...ing,
+      lotes: lotesPorId[ing.id] ?? [],
+    }));
+  },
 
   /** Busca por ID. Retorna null se não existir. */
   async buscarPorId(id: number): Promise<Ingrediente | null> {
@@ -105,17 +106,51 @@ async listarTodos(): Promise<Ingrediente[]> {
 
     // Registra a entrada inicial no histórico (se qtd > 0)
     if (input.qtd > 0) {
-  await db.execute({
-    sql: `INSERT INTO movimentacoes_estoque
-          (ingrediente_id, tipo, quantidade, preco_unitario, observacao, data, validade)
-          VALUES (?, 'entrada', ?, ?, 'Cadastro inicial', ?, ?)`,
-    args: [id, input.qtd, input.preco, hoje, input.validade ?? null],
-  });
-}
+      await db.execute({
+        sql: `INSERT INTO movimentacoes_estoque
+              (ingrediente_id, tipo, quantidade, preco_unitario, observacao, data, validade)
+              VALUES (?, 'entrada', ?, ?, 'Cadastro inicial', ?, ?)`,
+        args: [id, input.qtd, input.preco, hoje, input.validade ?? null],
+      });
+    }
 
     const criado = await this.buscarPorId(id);
     if (!criado) throw new Error('Falha ao recuperar ingrediente recém-criado');
     return criado;
+  },
+
+  /**
+   * Atualização parcial de um ingrediente (PUT /ingredientes/:id).
+   *
+   * Monta o SET dinamicamente a partir dos campos enviados. NUNCA toca em `qtd`
+   * (estoque só muda via movimentação). Retorna null se o ingrediente não existir.
+   */
+  async atualizar(id: number, update: IngredienteUpdateInput): Promise<Ingrediente | null> {
+    const db = getDb();
+    const atual = await this.buscarPorId(id);
+    if (!atual) return null;
+
+    const sets: string[] = [];
+    const args: (string | number | null)[] = [];
+
+    if (update.nome !== undefined)     { sets.push('nome = ?');     args.push(update.nome); }
+    if (update.unidade !== undefined)  { sets.push('unidade = ?');  args.push(update.unidade); }
+    if (update.preco !== undefined)    { sets.push('preco = ?');    args.push(update.preco); }
+    if (update.qtdMax !== undefined)   { sets.push('qtd_max = ?');  args.push(update.qtdMax); }
+    if (update.validade !== undefined) { sets.push('validade = ?'); args.push(update.validade); }
+
+    // Schema garante que há ao menos um campo; mas se nada chegou, devolve o atual.
+    if (sets.length === 0) return atual;
+
+    sets.push("atualizado_em = datetime('now')");
+    args.push(id);
+
+    await db.execute({
+      sql: `UPDATE ingredientes SET ${sets.join(', ')} WHERE id = ?`,
+      args,
+    });
+
+    return this.buscarPorId(id);
   },
 
   /**
@@ -145,18 +180,18 @@ async listarTodos(): Promise<Ingrediente[]> {
           args: [novaQtd, novaQtd, compra.precoUnitario, validade, id],
         },
         {
-  sql: `INSERT INTO movimentacoes_estoque
-        (ingrediente_id, tipo, quantidade, preco_unitario, observacao, data, validade)
-        VALUES (?, 'entrada', ?, ?, ?, ?, ?)`,
-  args: [
-    id,
-    compra.quantidade,
-    compra.precoUnitario,
-    compra.observacao ?? 'Nova compra',
-    hoje,
-    compra.validade ?? null,
-  ],
-},
+          sql: `INSERT INTO movimentacoes_estoque
+                (ingrediente_id, tipo, quantidade, preco_unitario, observacao, data, validade)
+                VALUES (?, 'entrada', ?, ?, ?, ?, ?)`,
+          args: [
+            id,
+            compra.quantidade,
+            compra.precoUnitario,
+            compra.observacao ?? 'Nova compra',
+            hoje,
+            compra.validade ?? null,
+          ],
+        },
       ],
       'write',
     );
