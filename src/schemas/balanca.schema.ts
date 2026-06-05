@@ -1,11 +1,38 @@
 /**
- * Validação dos payloads vindos da balança (ESP32) e do frontend.
+ * Validação dos payloads vindos da balança (ESP32) e do frontend usando Zod.
  */
 
+import { z } from 'zod';
 import { AppError } from '../errors/app-error.js';
+
+// Schema para payload de peso (ESP32)
+const PesoPayloadSchema = z.object({
+  peso: z
+    .number()
+    .min(-100, 'Peso fora do intervalo aceito (-100 a 1000 kg)')
+    .max(1000, 'Peso fora do intervalo aceito (-100 a 1000 kg)')
+    .finite('Campo "peso" deve ser numérico'),
+});
+
+// Schema para payload de confirmação de pesagem (frontend)
+const ConfirmarPayloadSchema = z.object({
+  ingredienteId: z
+    .number()
+    .int('Campo "ingredienteId" deve ser um inteiro')
+    .positive('Campo "ingredienteId" inválido'),
+  quantidadeConsumida: z
+    .number()
+    .positive('Campo "quantidadeConsumida" deve ser > 0')
+    .finite(),
+});
 
 interface PesoPayload {
   peso: number;
+}
+
+interface ConfirmarPayload {
+  ingredienteId: number;
+  quantidadeConsumida: number;
 }
 
 /**
@@ -13,28 +40,15 @@ interface PesoPayload {
  * O ESP32 manda { peso: number } a cada loop.
  */
 export function validatePesoPayload(body: unknown): PesoPayload {
-  if (!body || typeof body !== 'object') {
+  try {
+    return PesoPayloadSchema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const message = error.errors[0]?.message || 'Erro de validação';
+      throw new AppError(message, 400);
+    }
     throw new AppError('Payload inválido', 400);
   }
-
-  const b = body as Record<string, unknown>;
-  const peso = Number(b.peso);
-
-  if (!Number.isFinite(peso)) {
-    throw new AppError('Campo "peso" deve ser numérico', 400);
-  }
-
-  // ESP32 às vezes manda valores absurdos quando descalibrado. Limitar é defensivo.
-  if (peso < -100 || peso > 1000) {
-    throw new AppError('Peso fora do intervalo aceito (-100 a 1000 kg)', 400);
-  }
-
-  return { peso };
-}
-
-interface ConfirmarPayload {
-  ingredienteId: number;
-  quantidadeConsumida: number;  // já convertida para a unidade do ingrediente
 }
 
 /**
@@ -42,21 +56,13 @@ interface ConfirmarPayload {
  * Recebe qual ingrediente e quanto vai abater do estoque.
  */
 export function validateConfirmarPayload(body: unknown): ConfirmarPayload {
-  if (!body || typeof body !== 'object') {
+  try {
+    return ConfirmarPayloadSchema.parse(body);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const message = error.errors[0]?.message || 'Erro de validação';
+      throw new AppError(message, 400);
+    }
     throw new AppError('Payload inválido', 400);
   }
-
-  const b = body as Record<string, unknown>;
-
-  const ingredienteId = Number(b.ingredienteId);
-  if (!Number.isInteger(ingredienteId) || ingredienteId <= 0) {
-    throw new AppError('Campo "ingredienteId" inválido', 400);
-  }
-
-  const quantidadeConsumida = Number(b.quantidadeConsumida);
-  if (!Number.isFinite(quantidadeConsumida) || quantidadeConsumida <= 0) {
-    throw new AppError('Campo "quantidadeConsumida" deve ser > 0', 400);
-  }
-
-  return { ingredienteId, quantidadeConsumida };
 }
