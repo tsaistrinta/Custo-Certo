@@ -1,15 +1,27 @@
+# Dependências
 node_modules/
 dist/
+
+# Variáveis de ambiente — NUNCA comitar segredos
+.env
 .env.local
 .env.*.local
+
+# Banco local
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
 data/
+
+# Firmware (PlatformIO)
+firmware/.pio/
+firmware/.vscode/
+# Credenciais de Wi-Fi / URL do servidor ficam aqui (não versionado)
+firmware/secrets.ini
+
+# Sistema / editores
 .DS_Store
 .vscode/
 .idea/
 *.log
-firmware/.pio/
-firmware/.vscode/
