@@ -21,11 +21,11 @@
 // CONFIGURAÇÕES (sobrescreva via platformio.ini build_flags)
 // =====================================================
 #ifndef WIFI_SSID
-#define WIFI_SSID "AndroidAP"
+#define WIFI_SSID "DEFINA_NO_SECRETS_INI"
 #endif
 
 #ifndef WIFI_PASS
-#define WIFI_PASS "lucas1234"
+#define WIFI_PASS "DEFINA_NO_SECRETS_INI"
 #endif
 
 #ifndef SERVER_URL

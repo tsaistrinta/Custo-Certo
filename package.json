@@ -29,7 +29,6 @@
   },
   "devDependencies": {
     "@types/node": "^25.6.2",
-    "@types/swagger-ui-express": "^4.1.8",
     "cypress": "^15.15.0",
     "tsx": "^4.21.0"
   },
@@ -37,10 +36,12 @@
     "@libsql/client": "^0.17.3",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/swagger-ui-express": "^4.1.8",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "swagger-ui-express": "^5.0.1",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "zod": "^3.23.8"
   }
 }
